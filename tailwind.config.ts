@@ -28,6 +28,12 @@ export default {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'
 				},
+				pdf: {
+					blue: '#1976d2',
+					purple: '#9b87f5',
+					lightgray: '#f3f3f3',
+					darkgray: '#333333',
+				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
 					foreground: 'hsl(var(--secondary-foreground))'
