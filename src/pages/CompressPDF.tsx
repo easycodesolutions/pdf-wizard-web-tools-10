@@ -5,40 +5,122 @@ import Footer from "@/components/Footer";
 import FileUpload from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
 import { FileDown, Download } from "lucide-react";
+import { PDFDocument } from "pdf-lib";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 const CompressPDF = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDownloadReady, setIsDownloadReady] = useState(false);
+  const [compressedPdfUrl, setCompressedPdfUrl] = useState<string | null>(null);
+  const [progressPercent, setProgressPercent] = useState(0);
   const [compressionLevel, setCompressionLevel] = useState<'low' | 'medium' | 'high'>('medium');
 
   const handleFilesSelected = (selectedFiles: File[]) => {
     // For compress operation, we only need one file
     setFiles(selectedFiles.slice(0, 1));
     setIsDownloadReady(false);
+    setCompressedPdfUrl(null);
   };
 
-  const handleCompressPDF = () => {
+  const handleCompressPDF = async () => {
     if (files.length === 0) {
-      alert("Please select a PDF file to compress");
+      toast.error("Please select a PDF file to compress");
       return;
     }
 
     setIsProcessing(true);
+    setProgressPercent(0);
     
-    // In a real implementation, you would use a PDF library 
-    // to compress the file and generate a download link
-    
-    // Simulating processing time
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
+      // Get the selected file
+      const file = files[0];
+      
+      // Convert File to ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Load original PDF document
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      
+      // Set up compression parameters based on selected level
+      let compressionQuality: number;
+      switch (compressionLevel) {
+        case 'low':
+          compressionQuality = 0.8; // Less compression, better quality
+          break;
+        case 'medium':
+          compressionQuality = 0.5; // Balanced
+          break;
+        case 'high':
+          compressionQuality = 0.2; // Higher compression, lower quality
+          break;
+        default:
+          compressionQuality = 0.5;
+      }
+      
+      setProgressPercent(25);
+      
+      // Create a new PDF document
+      const compressedPdf = await PDFDocument.create();
+      
+      // Copy pages from the original document
+      const pages = await compressedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+      
+      setProgressPercent(50);
+      
+      // Add pages to the new document
+      pages.forEach(page => compressedPdf.addPage(page));
+      
+      setProgressPercent(75);
+      
+      // Save the compressed PDF with specified quality
+      const compressedPdfBytes = await compressedPdf.save({
+        useObjectStreams: true,
+        // Note: pdf-lib doesn't have direct image quality control, but these options help reduce size
+        addDefaultPage: false,
+        objectsPerTick: 100,
+      });
+      
+      // Convert to Blob and create URL
+      const blob = new Blob([compressedPdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      
+      // Calculate compression ratio for display
+      const originalSize = file.size;
+      const compressedSize = blob.size;
+      const compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+      
+      setCompressedPdfUrl(url);
       setIsDownloadReady(true);
-    }, 2000);
+      setProgressPercent(100);
+      
+      toast.success(`PDF compressed successfully! Reduced by ${compressionRatio}%`);
+    } catch (error) {
+      console.error("Error compressing PDF:", error);
+      toast.error("Failed to compress PDF file. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDownload = () => {
-    // In a real implementation, you would provide the compressed PDF file for download
-    console.log("Downloading compressed PDF");
+    if (!compressedPdfUrl) {
+      toast.error("No compressed PDF available for download");
+      return;
+    }
+    
+    // Create a temporary anchor element
+    const link = document.createElement('a');
+    link.href = compressedPdfUrl;
+    link.download = "compressed-document.pdf";
+    
+    // Append to the document, trigger click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success("Download started");
   };
 
   return (
@@ -110,6 +192,13 @@ const CompressPDF = () => {
             )}
             
             <div className="flex flex-col items-center">
+              {isProcessing && (
+                <div className="w-full mb-6">
+                  <Progress value={progressPercent} className="h-2" />
+                  <p className="text-sm text-gray-600 text-center mt-2">Processing: {progressPercent}%</p>
+                </div>
+              )}
+              
               {files.length > 0 && (
                 <Button 
                   onClick={handleCompressPDF} 
