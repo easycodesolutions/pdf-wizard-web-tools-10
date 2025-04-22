@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
@@ -7,13 +6,14 @@ import FileUpload from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
 import { PDFDocument } from "pdf-lib";
 import { Progress } from "@/components/ui/progress";
-import { Save, Type, Image, Shapes, Edit } from "lucide-react";
+import { Save, Type, Image, Shapes, Edit, Maximize } from "lucide-react";
 
 const EditPDF = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleFilesSelected = (selectedFiles: File[]) => {
     setFiles(selectedFiles);
@@ -25,6 +25,22 @@ const EditPDF = () => {
     } else {
       setPreviewUrl(null);
     }
+  };
+
+  const toggleFullscreen = () => {
+    const previewIframe = document.querySelector('iframe');
+    if (!previewIframe) return;
+
+    if (!isFullscreen) {
+      if (previewIframe.requestFullscreen) {
+        previewIframe.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+    setIsFullscreen(!isFullscreen);
   };
 
   const handleSave = async () => {
@@ -115,6 +131,15 @@ const EditPDF = () => {
                       </Button>
                       <Button variant="outline" size="sm" className="flex items-center gap-1">
                         <Edit className="h-4 w-4" /> Annotate
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center gap-1"
+                        onClick={toggleFullscreen}
+                      >
+                        <Maximize className="h-4 w-4" />
+                        {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
                       </Button>
                     </div>
                   </div>
