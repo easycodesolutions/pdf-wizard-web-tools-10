@@ -5,38 +5,93 @@ import Footer from "@/components/Footer";
 import FileUpload from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
 import { Merge, Download } from "lucide-react";
+import { PDFDocument } from "pdf-lib";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 const MergePDF = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDownloadReady, setIsDownloadReady] = useState(false);
+  const [mergedPdfUrl, setMergedPdfUrl] = useState<string | null>(null);
+  const [progressPercent, setProgressPercent] = useState(0);
 
   const handleFilesSelected = (selectedFiles: File[]) => {
     setFiles(selectedFiles);
     setIsDownloadReady(false);
+    setMergedPdfUrl(null);
   };
 
   const handleMergePDFs = async () => {
     if (files.length < 2) {
-      alert("Please select at least 2 PDF files to merge");
+      toast.error("Please select at least 2 PDF files to merge");
       return;
     }
 
     setIsProcessing(true);
+    setProgressPercent(0);
     
-    // In a real implementation, you would use a PDF library 
-    // to merge the files and generate a download link
-    
-    // Simulating processing time
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
+      // Create a new PDF document
+      const mergedPdf = await PDFDocument.create();
+      
+      // Process each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Convert File to ArrayBuffer
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Load PDF document
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        
+        // Get all pages from the document
+        const pages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+        
+        // Add each page to the new document
+        pages.forEach((page) => {
+          mergedPdf.addPage(page);
+        });
+        
+        // Update progress
+        setProgressPercent(Math.round(((i + 1) / files.length) * 100));
+      }
+      
+      // Save the merged PDF
+      const mergedPdfBytes = await mergedPdf.save();
+      
+      // Convert to Blob and create URL
+      const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      
+      setMergedPdfUrl(url);
       setIsDownloadReady(true);
-    }, 2000);
+      toast.success("PDF files merged successfully");
+    } catch (error) {
+      console.error("Error merging PDFs:", error);
+      toast.error("Failed to merge PDF files. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDownload = () => {
-    // In a real implementation, you would provide the merged PDF file for download
-    console.log("Downloading merged PDF");
+    if (!mergedPdfUrl) {
+      toast.error("No merged PDF available for download");
+      return;
+    }
+    
+    // Create a temporary anchor element
+    const link = document.createElement('a');
+    link.href = mergedPdfUrl;
+    link.download = "merged-document.pdf";
+    
+    // Append to the document, trigger click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success("Download started");
   };
 
   return (
@@ -65,6 +120,13 @@ const MergePDF = () => {
             />
             
             <div className="flex flex-col items-center">
+              {isProcessing && (
+                <div className="w-full mb-6">
+                  <Progress value={progressPercent} className="h-2" />
+                  <p className="text-sm text-gray-600 text-center mt-2">Processing: {progressPercent}%</p>
+                </div>
+              )}
+              
               {files.length > 0 && (
                 <Button 
                   onClick={handleMergePDFs} 
